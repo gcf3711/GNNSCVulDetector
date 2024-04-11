@@ -123,3 +123,190 @@ If any question, please email to messi.qp711@gmail.com. And, the code is adapted
 
 
 
+## Comments
+
+```bash
+git clone https://github.com/Messi-Q/GNNSCVulDetector.git
+
+# directory tree
+GNNSCVulDetector/
+├── BasicModel.py
+├── data # Outputs of Step2: the nodes and edges of contract graphs
+│   ├── reentrancy
+│   │   ├── graph_data
+│   │   │   ├── edge
+│   │   │   │   ├── 22247.sol
+│   │   │   │   ├── 6881.sol
+│   │   │   │   ├── Bank.sol
+│   │   │   │   ├── cross-function-reentrancy-fixed.sol
+│   │   │   │   ├── cross-function-reentrancy.sol
+│   │   │   │   ├── dumbDAO.sol
+│   │   │   │   ├── EtherStore.sol
+│   │   │   │   ├── No_Reentrance.sol
+│   │   │   │   ├── PrivateBank.sol
+│   │   │   │   ├── Reentrance_01.sol
+│   │   │   │   ├── Reentrance_02.sol
+│   │   │   │   ├── Reentrance_exploit.sol
+│   │   │   │   ├── SendBalance.sol
+│   │   │   │   ├── simple_dao_fixed.sol
+│   │   │   │   ├── simple_dao.sol
+│   │   │   │   ├── SimpleDAO.sol
+│   │   │   │   └── Victim.sol
+│   │   │   └── node
+│   │   │       ├── 22247.sol
+│   │   │       ├── 6881.sol
+│   │   │       ├── Bank.sol
+│   │   │       ├── cross-function-reentrancy-fixed.sol
+│   │   │       ├── cross-function-reentrancy.sol
+│   │   │       ├── dumbDAO.sol
+│   │   │       ├── EtherStore.sol
+│   │   │       ├── No_Reentrance.sol
+│   │   │       ├── PrivateBank.sol
+│   │   │       ├── Reentrance_01.sol
+│   │   │       ├── Reentrance_02.sol
+│   │   │       ├── Reentrance_exploit.sol
+│   │   │       ├── SendBalance.sol
+│   │   │       ├── simple_dao_fixed.sol
+│   │   │       ├── simple_dao.sol
+│   │   │       ├── SimpleDAO.sol
+│   │   │       └── Victim.sol
+│   │   └── source_code
+│   │       ├── 22247.sol
+│   │       ├── 6881.sol
+│   │       ├── Bank.sol
+│   │       ├── cross-function-reentrancy-fixed.sol
+│   │       ├── cross-function-reentrancy.sol
+│   │       ├── dumbDAO.sol
+│   │       ├── EtherStore.sol
+│   │       ├── No_Reentrance.sol
+│   │       ├── PrivateBank.sol
+│   │       ├── Reentrance_01.sol
+│   │       ├── Reentrance_02.sol
+│   │       ├── Reentrance_exploit.sol
+│   │       ├── SendBalance.sol
+│   │       ├── simple_dao_fixed.sol
+│   │       ├── simple_dao.sol
+│   │       ├── SimpleDAO.sol
+│   │       └── Victim.sol
+│   └── timestamp
+│       ├── graph_data
+│       │   ├── edge
+│       │   │   ├── 1813.sol
+│       │   │   ├── 20259.sol
+│       │   │   ├── 20888.sol
+│       │   │   ├── 22273.sol
+│       │   │   ├── 35897.sol
+│       │   │   ├── 37390.sol
+│       │   │   ├── 4453.sol
+│       │   │   ├── 4699.sol
+│       │   │   ├── 5353.sol
+│       │   │   ├── 6220.sol
+│       │   │   └── 6272.sol
+│       │   └── node
+│       │       ├── 1813.sol
+│       │       ├── 20259.sol
+│       │       ├── 20888.sol
+│       │       ├── 22273.sol
+│       │       ├── 35897.sol
+│       │       ├── 37390.sol
+│       │       ├── 4453.sol
+│       │       ├── 4699.sol
+│       │       ├── 5353.sol
+│       │       ├── 6220.sol
+│       │       └── 6272.sol
+│       └── source_code
+│           ├── 1813.sol
+│           ├── 20259.sol
+│           ├── 20888.sol
+│           ├── 22273.sol
+│           ├── 35897.sol
+│           ├── 37390.sol
+│           ├── 4453.sol
+│           ├── 4699.sol
+│           ├── 5353.sol
+│           ├── 6220.sol
+│           └── 6272.sol
+├── features # 
+│   ├── reentrancy
+│   │   ├── contract_name_train.txt
+│   │   ├── contract_name_valid.txt
+│   │   ├── label_by_experts_train.txt
+│   │   └── label_by_experts_valid.txt
+│   └── timestamp
+│       ├── contract_name_train.txt
+│       ├── contract_name_valid.txt
+│       ├── label_by_experts_train.txt
+│       ├── label_by_experts_valid.txt
+│       ├── timestamp_train_feature.txt
+│       └── timestamp_valid_feature.txt
+├── GNNSCModel.py
+├── README.md
+├── tools
+│   ├── construct_fragment.py # Step4(unnecessary): execute construct_fragment.py (Iutput: the Outputs of Step3 in ./reentrancy/results) (Output: ./reentrancy/results/xxx_fullnodes_all.json)
+│   ├── reentrancy
+│   │   ├── AutoExtractGraph.py # Step2: execute AutoExtractGraph.py (Input: xxx.sol files without comments) (Output: GNNSCVulDetector/data/[])
+│   │   ├── graph2vec.py  # Step3: execute AutoExtractGraph.py (Iutput: GNNSCVulDetector/data/[]) (Output: ./results)
+│   │   ├── reentrancy_contract_label.txt # used by Step3 
+│   │   ├── reentrancy_contract_name.txt # used by Step3
+│   │   ├── reentrancy_contract_number.txt # used by Step4(unnecessary)
+│   │   ├── results
+│   │   │   ├── Reentrancy_AutoExtract_corenodes.json # Outputs of Step3
+│   │   │   ├── Reentrancy_AutoExtract_corenodes.txt # Outputs of Step3
+│   │   │   ├── Reentrancy_AutoExtract_fullnodes_all.json  # Outputs of Step4(unnecessary)
+│   │   │   ├── Reentrancy_AutoExtract_fullnodes.json # Outputs of Step3
+│   │   │   └── Reentrancy_AutoExtract_fullnodes.txt  # Outputs of Step3
+│   │   └── vec2onehot.py
+│   ├── remove_comment.py # Step1: execute remove_comment.py (Input: xxx.sol files) (Output: xxx.sol files without comments)
+│   └── timestamp # same as ./reentrancy
+│       ├── AutoExtractGraph.py
+│       ├── graph2vec.py
+│       ├── results 
+│       │   ├── Timestamp_AutoExtract_corenodes.json
+│       │   ├── Timestamp_AutoExtract_corenodes.txt
+│       │   ├── Timestamp_AutoExtract_fullnodes_all.json
+│       │   ├── Timestamp_AutoExtract_fullnodes.json
+│       │   └── Timestamp_AutoExtract_fullnodes.txt
+│       ├── timestamp_contract_label.txt
+│       ├── timestamp_contract_name.txt
+│       ├── timestamp_contract_number.txt
+│       └── vec2onehot.py
+├── train_data
+│   ├── integeroverflow
+│   │   ├── train.json
+│   │   └── valid.json
+│   ├── reentrancy
+│   │   ├── train.json # from Reentrancy_AutoExtract_fullnodes.json
+│   │   └── valid.json
+│   └── timestamp
+│       ├── train.json
+│       └── valid.json
+├── train.sh
+└── utils.py
+```
+
+```bash
+conda create -n gnn_g python==3.7
+conda activate gnn_g
+pip install tensorflow==1.14.0
+pip install keras==2.2.4
+pip install scikit-learn==0.20.2
+pip install docopt
+
+python3 GNNSCModel.py --random_seed 9930 --thresholds 0.45
+
+# error
+TypeError: Descriptors cannot not be created directly.
+If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 3.19.0.
+If you cannot immediately regenerate your protos, some other possible workarounds are:
+ 1. Downgrade the protobuf package to 3.20.x or lower.
+ 2. Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python (but this will use pure-Python parsing and will be much slower).
+
+# solution https://stackoverflow.com/questions/72441758/typeerror-descriptors-cannot-not-be-created-directly
+pip uninstall protobuf
+pip install protobuf==3.20.*
+
+python3 GNNSCModel.py --random_seed 9930 --thresholds 0.45 # success
+
+```
+
+

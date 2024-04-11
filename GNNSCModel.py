@@ -504,6 +504,7 @@ def main():
     args = docopt(__doc__)
     model = GNNSCModel(args)
     model.train()
+    model.save('GNNSCModel.h5')
 
 
 if __name__ == "__main__":
