@@ -325,7 +325,8 @@ class GNNSCModel(DetectModel):
         tensorised_prop_schedules = []
         for prop_round in range(int(self.params[
                                         'propagation_rounds'])):  # propagation_rounds=1 #for prop_round in range(int(self.params['propagation_rounds'] / 2)):
-            dag_seed = min(num_incoming_edges.items(), key=lambda t: t[1])[prop_round]
+            
+            # dag_seed = min(num_incoming_edges.items(), key=lambda t: t[1])[prop_round]
             node_depths = {}
 
             # bfs_visit(outgoing_edges, node_depths, dag_seed, 0)
@@ -335,7 +336,9 @@ class GNNSCModel(DetectModel):
 
             # Now split edge into forward/backward sets, by using their depths.
             # Intuitively, a nodes with depth h will get updated in step h.
-            max_depth = max(node_depths.values())
+            max_depth = 0
+            if node_depths:
+                max_depth = max(node_depths.values())
             assert (max_depth <= self.params['propagation_substeps'])
             fwd_pass_edges = [[] for _ in range(max_depth)]
             bwd_pass_edges = [[] for _ in range(max_depth)]
@@ -504,7 +507,7 @@ def main():
     args = docopt(__doc__)
     model = GNNSCModel(args)
     model.train()
-    model.save('GNNSCModel.h5')
+    model.save_model('GNNSCModel_reentrancy.h5')
 
 
 if __name__ == "__main__":

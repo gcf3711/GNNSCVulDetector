@@ -1,0 +1,66 @@
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+There is no C node
+W0 S W0 1 FW
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+There is no C node
+W0 S W0 1 FW
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Currently, there is no key word call.value
+Traceback (most recent call last):
+  File "AutoExtractGraph.py", line 777, in <module>
+    node_feature, edge_feature = generate_graph(inputFilePath)
+  File "AutoExtractGraph.py", line 114, in generate_graph
+    result_params = result[0].split(",")
+IndexError: list index out of range

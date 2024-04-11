@@ -1,0 +1,641 @@
+ 
+pragma experimental ABIEncoderV2;
+
+
+pragma solidity ^0.7.0;
+
+
+
+contract DSMath {
+  uint constant WAD = 10 ** 18;
+  uint constant RAY = 10 ** 27;
+
+  function add(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.add(x, y);
+  }
+
+  function sub(uint x, uint y) internal virtual pure returns (uint z) {
+    z = SafeMath.sub(x, y);
+  }
+
+  function mul(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.mul(x, y);
+  }
+
+  function div(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.div(x, y);
+  }
+
+  function wmul(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.add(SafeMath.mul(x, y), WAD / 2) / WAD;
+  }
+
+  function wdiv(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.add(SafeMath.mul(x, WAD), y / 2) / y;
+  }
+
+  function rdiv(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.add(SafeMath.mul(x, RAY), y / 2) / y;
+  }
+
+  function rmul(uint x, uint y) internal pure returns (uint z) {
+    z = SafeMath.add(SafeMath.mul(x, y), RAY / 2) / RAY;
+  }
+
+  function toInt(uint x) internal pure returns (int y) {
+    y = int(x);
+    require(y >= 0, "int-overflow");
+  }
+
+  function toRad(uint wad) internal pure returns (uint rad) {
+    rad = mul(wad, 10 ** 27);
+  }
+
+}
+
+pragma solidity ^0.7.0;
+
+
+
+
+abstract contract Stores {
+
+   
+  address constant internal ethAddr = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+   
+  address constant internal wethAddr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+   
+  MemoryInterface constant internal instaMemory = MemoryInterface(0x8a5419CfC711B2343c17a6ABf4B2bAFaBb06957F);
+
+   
+  InstaMapping constant internal instaMapping = InstaMapping(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
+
+   
+  function getUint(uint getId, uint val) internal returns (uint returnVal) {
+    returnVal = getId == 0 ? val : instaMemory.getUint(getId);
+  }
+
+   
+  function setUint(uint setId, uint val) virtual internal {
+    if (setId != 0) instaMemory.setUint(setId, val);
+  }
+
+}
+
+pragma solidity ^0.7.0;
+
+
+
+
+
+abstract contract Basic is DSMath, Stores {
+
+    function convert18ToDec(uint _dec, uint256 _amt) internal pure returns (uint256 amt) {
+        amt = (_amt / 10 ** (18 - _dec));
+    }
+
+    function convertTo18(uint _dec, uint256 _amt) internal pure returns (uint256 amt) {
+        amt = mul(_amt, 10 ** (18 - _dec));
+    }
+
+    function getTokenBal(TokenInterface token) internal view returns(uint _amt) {
+        _amt = address(token) == ethAddr ? address(this).balance : token.balanceOf(address(this));
+    }
+
+    function getTokensDec(TokenInterface buyAddr, TokenInterface sellAddr) internal view returns(uint buyDec, uint sellDec) {
+        buyDec = address(buyAddr) == ethAddr ?  18 : buyAddr.decimals();
+        sellDec = address(sellAddr) == ethAddr ?  18 : sellAddr.decimals();
+    }
+
+    function encodeEvent(string memory eventName, bytes memory eventParam) internal pure returns (bytes memory) {
+        return abi.encode(eventName, eventParam);
+    }
+
+    function approve(TokenInterface token, address spender, uint256 amount) internal {
+        try token.approve(spender, amount) {
+
+        } catch {
+            token.approve(spender, 0);
+            token.approve(spender, amount);
+        }
+    }
+
+    function changeEthAddress(address buy, address sell) internal pure returns(TokenInterface _buy, TokenInterface _sell){
+        _buy = buy == ethAddr ? TokenInterface(wethAddr) : TokenInterface(buy);
+        _sell = sell == ethAddr ? TokenInterface(wethAddr) : TokenInterface(sell);
+    }
+
+    function convertEthToWeth(bool isEth, TokenInterface token, uint amount) internal {
+        if(isEth) token.deposit{value: amount}();
+    }
+
+    function convertWethToEth(bool isEth, TokenInterface token, uint amount) internal {
+       if(isEth) {
+            approve(token, address(token), amount);
+            token.withdraw(amount);
+        }
+    }
+}
+
+pragma solidity ^0.7.0;
+
+
+
+
+
+abstract contract Helpers is DSMath, Basic {
+     
+    ComptrollerInterface internal constant troller = ComptrollerInterface(0x9dB10B9429989cC13408d7368644D4A1CB704ea3);
+
+     
+    CompoundMappingInterface internal constant compMapping = CompoundMappingInterface(0xe7a85d0adDB972A4f0A4e57B698B37f171519e88);
+
+     
+    function getMapping(string calldata tokenId) public returns(address token, address btoken) {
+        address ctoken;
+        (token, ctoken) = compMapping.getMapping(tokenId);
+        btoken = BComptrollerInterface(address(troller)).c2b(ctoken);
+    }
+}
+
+pragma solidity ^0.7.0;
+
+contract Events {
+    event LogDeposit(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+
+    event LogWithdraw(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+
+    event LogBorrow(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+
+    event LogPayback(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+
+    event LogDepositCToken(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 cTokenAmt,
+        uint256 getId, 
+        uint256 setId
+    );
+
+    event LogWithdrawCToken(
+        address indexed token,
+        address cToken,
+        uint256 tokenAmt,
+        uint256 cTokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+    
+    event LogLiquidate(
+        address indexed borrower,
+        address indexed tokenToPay,
+        address indexed tokenInReturn,
+        uint256 tokenAmt,
+        uint256 getId,
+        uint256 setId
+    );
+}
+pragma solidity ^0.7.0;
+
+
+ 
+
+
+
+
+
+
+
+abstract contract BCompoundResolver is Events, Helpers {
+     
+    function depositRaw(
+        address token,
+        address cToken,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _amt = getUint(getId, amt);
+
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        if (token == ethAddr) {
+            _amt = _amt == uint(-1) ? address(this).balance : _amt;
+            CETHInterface(cToken).mint{value: _amt}();
+        } else {
+            TokenInterface tokenContract = TokenInterface(token);
+            _amt = _amt == uint(-1) ? tokenContract.balanceOf(address(this)) : _amt;
+            approve(tokenContract, cToken, _amt);
+            require(CTokenInterface(cToken).mint(_amt) == 0, "deposit-failed");
+        }
+        setUint(setId, _amt);
+
+        _eventName = "LogDeposit(address,address,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, _amt, getId, setId);
+    }
+
+     
+    function deposit(
+        string calldata tokenId,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = depositRaw(token, cToken, amt, getId, setId);
+    }
+
+     
+    function withdrawRaw(
+        address token,
+        address cToken,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _amt = getUint(getId, amt);
+        
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        CTokenInterface cTokenContract = CTokenInterface(cToken);
+        if (_amt == uint(-1)) {
+            TokenInterface tokenContract = TokenInterface(token);
+            uint initialBal = token == ethAddr ? address(this).balance : tokenContract.balanceOf(address(this));
+            require(cTokenContract.redeem(cTokenContract.balanceOf(address(this))) == 0, "full-withdraw-failed");
+            uint finalBal = token == ethAddr ? address(this).balance : tokenContract.balanceOf(address(this));
+            _amt = finalBal - initialBal;
+        } else {
+            require(cTokenContract.redeemUnderlying(_amt) == 0, "withdraw-failed");
+        }
+        setUint(setId, _amt);
+
+        _eventName = "LogWithdraw(address,address,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, _amt, getId, setId);
+    }
+
+     
+    function withdraw(
+        string calldata tokenId,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = withdrawRaw(token, cToken, amt, getId, setId);
+    }
+
+     
+    function borrowRaw(
+        address token,
+        address cToken,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _amt = getUint(getId, amt);
+
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        require(CTokenInterface(cToken).borrow(_amt) == 0, "borrow-failed");
+        setUint(setId, _amt);
+
+        _eventName = "LogBorrow(address,address,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, _amt, getId, setId);
+    }
+
+      
+    function borrow(
+        string calldata tokenId,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = borrowRaw(token, cToken, amt, getId, setId);
+    }
+
+     
+    function paybackRaw(
+        address token,
+        address cToken,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _amt = getUint(getId, amt);
+
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        CTokenInterface cTokenContract = CTokenInterface(cToken);
+        _amt = _amt == uint(-1) ? cTokenContract.borrowBalanceCurrent(address(this)) : _amt;
+
+        if (token == ethAddr) {
+            require(address(this).balance >= _amt, "not-enough-eth");
+            CETHInterface(cToken).repayBorrow{value: _amt}();
+        } else {
+            TokenInterface tokenContract = TokenInterface(token);
+            require(tokenContract.balanceOf(address(this)) >= _amt, "not-enough-token");
+            approve(tokenContract, cToken, _amt);
+            require(cTokenContract.repayBorrow(_amt) == 0, "repay-failed.");
+        }
+        setUint(setId, _amt);
+
+        _eventName = "LogPayback(address,address,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, _amt, getId, setId);
+    }
+
+     
+    function payback(
+        string calldata tokenId,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = paybackRaw(token, cToken, amt, getId, setId);
+    }
+
+     
+    function depositCTokenRaw(
+        address token,
+        address cToken,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _amt = getUint(getId, amt);
+
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        CTokenInterface ctokenContract = CTokenInterface(cToken);
+        uint initialBal = ctokenContract.balanceOf(address(this));
+
+        if (token == ethAddr) {
+            _amt = _amt == uint(-1) ? address(this).balance : _amt;
+            CETHInterface(cToken).mint{value: _amt}();
+        } else {
+            TokenInterface tokenContract = TokenInterface(token);
+            _amt = _amt == uint(-1) ? tokenContract.balanceOf(address(this)) : _amt;
+            approve(tokenContract, cToken, _amt);
+            require(ctokenContract.mint(_amt) == 0, "deposit-ctoken-failed.");
+        }
+
+        uint _cAmt;
+
+        {
+            uint finalBal = ctokenContract.balanceOf(address(this));
+            _cAmt = sub(finalBal, initialBal);
+
+            setUint(setId, _cAmt);
+        }
+
+        _eventName = "LogDepositCToken(address,address,uint256,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, _amt, _cAmt, getId, setId);
+    }
+
+     
+    function depositCToken(
+        string calldata tokenId,
+        uint256 amt,
+        uint256 getId,
+        uint256 setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = depositCTokenRaw(token, cToken, amt, getId, setId);
+    }
+
+     
+    function withdrawCTokenRaw(
+        address token,
+        address cToken,
+        uint cTokenAmt,
+        uint getId,
+        uint setId
+    ) public payable returns (string memory _eventName, bytes memory _eventParam) {
+        uint _cAmt = getUint(getId, cTokenAmt);
+        require(token != address(0) && cToken != address(0), "invalid token/ctoken address");
+
+        CTokenInterface cTokenContract = CTokenInterface(cToken);
+        TokenInterface tokenContract = TokenInterface(token);
+        _cAmt = _cAmt == uint(-1) ? cTokenContract.balanceOf(address(this)) : _cAmt;
+
+        uint withdrawAmt;
+        {
+            uint initialBal = token != ethAddr ? tokenContract.balanceOf(address(this)) : address(this).balance;
+            require(cTokenContract.redeem(_cAmt) == 0, "redeem-failed");
+            uint finalBal = token != ethAddr ? tokenContract.balanceOf(address(this)) : address(this).balance;
+
+            withdrawAmt = sub(finalBal, initialBal);
+        }
+
+        setUint(setId, withdrawAmt);
+
+        _eventName = "LogWithdrawCToken(address,address,uint256,uint256,uint256,uint256)";
+        _eventParam = abi.encode(token, cToken, withdrawAmt, _cAmt, getId, setId);
+    }
+
+     
+    function withdrawCToken(
+        string calldata tokenId,
+        uint cTokenAmt,
+        uint getId,
+        uint setId
+    ) external payable returns (string memory _eventName, bytes memory _eventParam) {
+        (address token, address cToken) = getMapping(tokenId);
+        (_eventName, _eventParam) = withdrawCTokenRaw(token, cToken, cTokenAmt, getId, setId);
+    }
+}
+
+contract ConnectV2BCompound is BCompoundResolver {
+    string public constant name = "B.Compound-v1.0";
+}
+
+pragma solidity ^0.7.0;
+
+interface TokenInterface {
+    function approve(address, uint256) external;
+    function transfer(address, uint) external;
+    function transferFrom(address, address, uint) external;
+    function deposit() external payable;
+    function withdraw(uint) external;
+    function balanceOf(address) external view returns (uint);
+    function decimals() external view returns (uint);
+}
+
+interface MemoryInterface {
+    function getUint(uint id) external returns (uint num);
+    function setUint(uint id, uint val) external;
+}
+
+interface InstaMapping {
+    function cTokenMapping(address) external view returns (address);
+    function gemJoinMapping(bytes32) external view returns (address);
+}
+
+interface AccountInterface {
+    function enable(address) external;
+    function disable(address) external;
+    function isAuth(address) external view returns (bool);
+}
+
+pragma solidity ^0.7.0;
+
+interface CTokenInterface {
+    function mint(uint mintAmount) external returns (uint);
+    function redeem(uint redeemTokens) external returns (uint);
+    function borrow(uint borrowAmount) external returns (uint);
+    function repayBorrow(uint repayAmount) external returns (uint);
+    function repayBorrowBehalf(address borrower, uint repayAmount) external returns (uint);  
+    function liquidateBorrow(address borrower, uint repayAmount, address cTokenCollateral) external returns (uint);
+
+    function borrowBalanceCurrent(address account) external returns (uint);
+    function redeemUnderlying(uint redeemAmount) external returns (uint);
+    function exchangeRateCurrent() external returns (uint);
+
+    function balanceOf(address owner) external view returns (uint256 balance);
+}
+
+interface CETHInterface {
+    function mint() external payable;
+    function repayBorrow() external payable;
+    function repayBorrowBehalf(address borrower) external payable;
+    function liquidateBorrow(address borrower, address cTokenCollateral) external payable;
+}
+
+interface ComptrollerInterface {
+    function enterMarkets(address[] calldata cTokens) external returns (uint[] memory);
+    function exitMarket(address cTokenAddress) external returns (uint);
+    function getAssetsIn(address account) external view returns (address[] memory);
+    function getAccountLiquidity(address account) external view returns (uint, uint, uint);
+    function claimComp(address) external;
+}
+
+interface CompoundMappingInterface {
+    function cTokenMapping(string calldata tokenId) external view returns (address);
+    function getMapping(string calldata tokenId) external view returns (address, address);
+}
+
+interface BComptrollerInterface {
+    function c2b(address ctoken) external view returns(address);
+}
+
+ 
+
+pragma solidity >=0.6.0 <0.8.0;
+
+ 
+library SafeMath {
+     
+    function tryAdd(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        uint256 c = a + b;
+        if (c < a) return (false, 0);
+        return (true, c);
+    }
+
+     
+    function trySub(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        if (b > a) return (false, 0);
+        return (true, a - b);
+    }
+
+     
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+         
+         
+         
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+     
+    function tryDiv(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        if (b == 0) return (false, 0);
+        return (true, a / b);
+    }
+
+     
+    function tryMod(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        if (b == 0) return (false, 0);
+        return (true, a % b);
+    }
+
+     
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+        return c;
+    }
+
+     
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b <= a, "SafeMath: subtraction overflow");
+        return a - b;
+    }
+
+     
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) return 0;
+        uint256 c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+        return c;
+    }
+
+     
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0, "SafeMath: division by zero");
+        return a / b;
+    }
+
+     
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0, "SafeMath: modulo by zero");
+        return a % b;
+    }
+
+     
+    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b <= a, errorMessage);
+        return a - b;
+    }
+
+     
+    function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b > 0, errorMessage);
+        return a / b;
+    }
+
+     
+    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b > 0, errorMessage);
+        return a % b;
+    }
+}

@@ -29,7 +29,8 @@ class DetectModel(object):
             'task_ids': [0],
 
             'train_file': 'train_data/reentrancy/train.json',
-            'valid_file': 'train_data/reentrancy/valid.json'
+            # 'valid_file': 'train_data/reentrancy/valid.json'
+            'valid_file': 'tools/reentrancy/results_mainnet/Reentrancy_AutoExtract_fullnodes.json'
 
             # 'train_file': 'train_data/timestamp/train.json',
             # 'valid_file': 'train_data/timestamp/valid.json'
@@ -120,8 +121,9 @@ class DetectModel(object):
         # Get some common baseline out:
         num_fwd_edge_types = 0
         for g in data:
-            self.max_num_vertices = max(self.max_num_vertices, max([v for e in g['graph'] for v in [e[0], e[2]]]))
-            num_fwd_edge_types = max(num_fwd_edge_types, max([e[1] for e in g['graph']]))
+            if g['graph']:
+                self.max_num_vertices = max(self.max_num_vertices, max([v for e in g['graph'] for v in [e[0], e[2]]]))
+                num_fwd_edge_types = max(num_fwd_edge_types, max([e[1] for e in g['graph']]))
         self.num_edge_types = max(self.num_edge_types, num_fwd_edge_types * (1 if self.params['tie_fwd_bkwd'] else 2))
         self.annotation_size = max(self.annotation_size, len(data[0]["node_features"][0]))
 

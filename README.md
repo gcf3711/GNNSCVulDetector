@@ -245,7 +245,7 @@ GNNSCVulDetector/
 │   ├── construct_fragment.py # Step4(unnecessary): execute construct_fragment.py (Iutput: the Outputs of Step3 in ./reentrancy/results) (Output: ./reentrancy/results/xxx_fullnodes_all.json)
 │   ├── reentrancy
 │   │   ├── AutoExtractGraph.py # Step2: execute AutoExtractGraph.py (Input: xxx.sol files without comments) (Output: GNNSCVulDetector/data/[])
-│   │   ├── graph2vec.py  # Step3: execute AutoExtractGraph.py (Iutput: GNNSCVulDetector/data/[]) (Output: ./results)
+│   │   ├── graph2vec.py  # Step3: execute graph2vec.py (Iutput: GNNSCVulDetector/data/[]) (Output: ./results)
 │   │   ├── reentrancy_contract_label.txt # used by Step3 
 │   │   ├── reentrancy_contract_name.txt # used by Step3
 │   │   ├── reentrancy_contract_number.txt # used by Step4(unnecessary)
@@ -306,6 +306,8 @@ pip uninstall protobuf
 pip install protobuf==3.20.*
 
 python3 GNNSCModel.py --random_seed 9930 --thresholds 0.45 # success
+
+
 
 ```
 

@@ -1,0 +1,2217 @@
+ 
+pragma abicoder v2;
+
+ 
+
+ 
+
+pragma solidity 0.7.6;
+
+
+ 
+interface IERC20 {
+     
+    function totalSupply() external view returns (uint256);
+
+     
+    function balanceOf(address account) external view returns (uint256);
+
+     
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
+     
+    function allowance(address owner, address spender) external view returns (uint256);
+
+     
+    function approve(address spender, uint256 amount) external returns (bool);
+
+     
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+     
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+     
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+interface IPopsicleV3Optimizer {
+    
+    
+    function token0() external view returns (address);
+
+    
+    
+    function token1() external view returns (address);
+    
+    
+    
+     
+     
+    
+    function tickSpacing() external view returns (int24);
+
+    
+     
+    
+    function pool() external view returns (IUniswapV3Pool);
+
+    
+    function tickLower() external view returns (int24);
+
+    
+    function tickUpper() external view returns (int24);
+
+     
+    function deposit(uint256 amount0Desired, uint256 amount1Desired, address to) external returns (uint256 shares, uint256 amount0,uint256 amount1);
+
+     
+    function withdraw(uint256 shares, address to) external returns (uint256 amount0, uint256 amount1);
+
+     
+    function rerange() external;
+
+     
+    function rebalance() external;
+}
+
+interface IOptimizerStrategy {
+    
+    function maxTotalSupply() external view returns (uint256);
+
+    
+    
+    function twapDuration() external view returns (uint32);
+
+    
+    function maxTwapDeviation() external view returns (int24);
+
+    
+    function tickRangeMultiplier() external view returns (int24);
+
+    
+    
+    function priceImpactPercentage() external view returns (uint24);
+}
+
+library PositionKey {
+    
+    function compute(
+        address owner,
+        int24 tickLower,
+        int24 tickUpper
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(owner, tickLower, tickUpper));
+    }
+}
+
+
+
+ 
+library TickMath {
+    
+    int24 internal constant MIN_TICK = -887272;
+    
+    int24 internal constant MAX_TICK = -MIN_TICK;
+
+    
+    uint160 internal constant MIN_SQRT_RATIO = 4295128739;
+    
+    uint160 internal constant MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342;
+
+    
+    
+    
+    
+     
+    function getSqrtRatioAtTick(int24 tick) internal pure returns (uint160 sqrtPriceX96) {
+        uint256 absTick = tick < 0 ? uint256(-int256(tick)) : uint256(int256(tick));
+        require(absTick <= uint256(MAX_TICK), 'T');
+
+        uint256 ratio = absTick & 0x1 != 0 ? 0xfffcb933bd6fad37aa2d162d1a594001 : 0x100000000000000000000000000000000;
+        if (absTick & 0x2 != 0) ratio = (ratio * 0xfff97272373d413259a46990580e213a) >> 128;
+        if (absTick & 0x4 != 0) ratio = (ratio * 0xfff2e50f5f656932ef12357cf3c7fdcc) >> 128;
+        if (absTick & 0x8 != 0) ratio = (ratio * 0xffe5caca7e10e4e61c3624eaa0941cd0) >> 128;
+        if (absTick & 0x10 != 0) ratio = (ratio * 0xffcb9843d60f6159c9db58835c926644) >> 128;
+        if (absTick & 0x20 != 0) ratio = (ratio * 0xff973b41fa98c081472e6896dfb254c0) >> 128;
+        if (absTick & 0x40 != 0) ratio = (ratio * 0xff2ea16466c96a3843ec78b326b52861) >> 128;
+        if (absTick & 0x80 != 0) ratio = (ratio * 0xfe5dee046a99a2a811c461f1969c3053) >> 128;
+        if (absTick & 0x100 != 0) ratio = (ratio * 0xfcbe86c7900a88aedcffc83b479aa3a4) >> 128;
+        if (absTick & 0x200 != 0) ratio = (ratio * 0xf987a7253ac413176f2b074cf7815e54) >> 128;
+        if (absTick & 0x400 != 0) ratio = (ratio * 0xf3392b0822b70005940c7a398e4b70f3) >> 128;
+        if (absTick & 0x800 != 0) ratio = (ratio * 0xe7159475a2c29b7443b29c7fa6e889d9) >> 128;
+        if (absTick & 0x1000 != 0) ratio = (ratio * 0xd097f3bdfd2022b8845ad8f792aa5825) >> 128;
+        if (absTick & 0x2000 != 0) ratio = (ratio * 0xa9f746462d870fdf8a65dc1f90e061e5) >> 128;
+        if (absTick & 0x4000 != 0) ratio = (ratio * 0x70d869a156d2a1b890bb3df62baf32f7) >> 128;
+        if (absTick & 0x8000 != 0) ratio = (ratio * 0x31be135f97d08fd981231505542fcfa6) >> 128;
+        if (absTick & 0x10000 != 0) ratio = (ratio * 0x9aa508b5b7a84e1c677de54f3e99bc9) >> 128;
+        if (absTick & 0x20000 != 0) ratio = (ratio * 0x5d6af8dedb81196699c329225ee604) >> 128;
+        if (absTick & 0x40000 != 0) ratio = (ratio * 0x2216e584f5fa1ea926041bedfe98) >> 128;
+        if (absTick & 0x80000 != 0) ratio = (ratio * 0x48a170391f7dc42444e8fa2) >> 128;
+
+        if (tick > 0) ratio = type(uint256).max / ratio;
+
+         
+         
+         
+        sqrtPriceX96 = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
+    }
+
+    
+    
+     
+    
+    
+    function getTickAtSqrtRatio(uint160 sqrtPriceX96) internal pure returns (int24 tick) {
+         
+        require(sqrtPriceX96 >= MIN_SQRT_RATIO && sqrtPriceX96 < MAX_SQRT_RATIO, 'R');
+        uint256 ratio = uint256(sqrtPriceX96) << 32;
+
+        uint256 r = ratio;
+        uint256 msb = 0;
+
+        assembly {
+            let f := shl(7, gt(r, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(6, gt(r, 0xFFFFFFFFFFFFFFFF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(5, gt(r, 0xFFFFFFFF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(4, gt(r, 0xFFFF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(3, gt(r, 0xFF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(2, gt(r, 0xF))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := shl(1, gt(r, 0x3))
+            msb := or(msb, f)
+            r := shr(f, r)
+        }
+        assembly {
+            let f := gt(r, 0x1)
+            msb := or(msb, f)
+        }
+
+        if (msb >= 128) r = ratio >> (msb - 127);
+        else r = ratio << (127 - msb);
+
+        int256 log_2 = (int256(msb) - 128) << 64;
+
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(63, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(62, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(61, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(60, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(59, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(58, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(57, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(56, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(55, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(54, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(53, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(52, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(51, f))
+            r := shr(f, r)
+        }
+        assembly {
+            r := shr(127, mul(r, r))
+            let f := shr(128, r)
+            log_2 := or(log_2, shl(50, f))
+        }
+
+        int256 log_sqrt10001 = log_2 * 255738958999603826347141;  
+
+        int24 tickLow = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
+        int24 tickHi = int24((log_sqrt10001 + 291339464771989622907027621153398088495) >> 128);
+
+        tick = tickLow == tickHi ? tickLow : getSqrtRatioAtTick(tickHi) <= sqrtPriceX96 ? tickHi : tickLow;
+    }
+}
+
+
+
+
+
+library LiquidityAmounts {
+    
+    
+    
+    function toUint128(uint256 x) private pure returns (uint128 y) {
+        require((y = uint128(x)) == x);
+    }
+
+    
+    
+    
+    
+    
+    
+    function getLiquidityForAmount0(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint256 amount0
+    ) internal pure returns (uint128 liquidity) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        uint256 intermediate = FullMath.mulDiv(sqrtRatioAX96, sqrtRatioBX96, FixedPoint96.Q96);
+        return toUint128(FullMath.mulDiv(amount0, intermediate, sqrtRatioBX96 - sqrtRatioAX96));
+    }
+
+    
+    
+    
+    
+    
+    
+    function getLiquidityForAmount1(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint256 amount1
+    ) internal pure returns (uint128 liquidity) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+        return toUint128(FullMath.mulDiv(amount1, FixedPoint96.Q96, sqrtRatioBX96 - sqrtRatioAX96));
+    }
+
+    
+     
+    
+    
+    
+    
+    
+    
+    function getLiquidityForAmounts(
+        uint160 sqrtRatioX96,
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint256 amount0,
+        uint256 amount1
+    ) internal pure returns (uint128 liquidity) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        if (sqrtRatioX96 <= sqrtRatioAX96) {
+            liquidity = getLiquidityForAmount0(sqrtRatioAX96, sqrtRatioBX96, amount0);
+        } else if (sqrtRatioX96 < sqrtRatioBX96) {
+            uint128 liquidity0 = getLiquidityForAmount0(sqrtRatioX96, sqrtRatioBX96, amount0);
+            uint128 liquidity1 = getLiquidityForAmount1(sqrtRatioAX96, sqrtRatioX96, amount1);
+
+            liquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        } else {
+            liquidity = getLiquidityForAmount1(sqrtRatioAX96, sqrtRatioBX96, amount1);
+        }
+    }
+
+    
+    
+    
+    
+    
+    function getAmount0ForLiquidity(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint128 liquidity
+    ) internal pure returns (uint256 amount0) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        return
+            FullMath.mulDiv(
+                uint256(liquidity) << FixedPoint96.RESOLUTION,
+                sqrtRatioBX96 - sqrtRatioAX96,
+                sqrtRatioBX96
+            ) / sqrtRatioAX96;
+    }
+
+    
+    
+    
+    
+    
+    function getAmount1ForLiquidity(
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint128 liquidity
+    ) internal pure returns (uint256 amount1) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        return FullMath.mulDiv(liquidity, sqrtRatioBX96 - sqrtRatioAX96, FixedPoint96.Q96);
+    }
+
+    
+     
+    
+    
+    
+    
+    
+    
+    function getAmountsForLiquidity(
+        uint160 sqrtRatioX96,
+        uint160 sqrtRatioAX96,
+        uint160 sqrtRatioBX96,
+        uint128 liquidity
+    ) internal pure returns (uint256 amount0, uint256 amount1) {
+        if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
+
+        if (sqrtRatioX96 <= sqrtRatioAX96) {
+            amount0 = getAmount0ForLiquidity(sqrtRatioAX96, sqrtRatioBX96, liquidity);
+        } else if (sqrtRatioX96 < sqrtRatioBX96) {
+            amount0 = getAmount0ForLiquidity(sqrtRatioX96, sqrtRatioBX96, liquidity);
+            amount1 = getAmount1ForLiquidity(sqrtRatioAX96, sqrtRatioX96, liquidity);
+        } else {
+            amount1 = getAmount1ForLiquidity(sqrtRatioAX96, sqrtRatioBX96, liquidity);
+        }
+    }
+}
+
+
+
+library PoolVariables {
+    using LowGasSafeMath for uint256;
+    using LowGasSafeMath for uint128;
+
+     
+    struct Info {
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0;
+        uint256 amount1;
+        uint128 liquidity;
+        int24 tickLower;
+        int24 tickUpper;
+    }
+
+    
+    
+    
+    
+    
+    
+    function amountsForLiquidity(
+        IUniswapV3Pool pool,
+        uint128 liquidity,
+        int24 _tickLower,
+        int24 _tickUpper
+    ) internal view returns (uint256, uint256) {
+         
+        (uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
+        return
+            LiquidityAmounts.getAmountsForLiquidity(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(_tickLower),
+                TickMath.getSqrtRatioAtTick(_tickUpper),
+                liquidity
+            );
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    function liquidityForAmounts(
+        IUniswapV3Pool pool,
+        uint256 amount0,
+        uint256 amount1,
+        int24 _tickLower,
+        int24 _tickUpper
+    ) internal view returns (uint128) {
+         
+        (uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
+
+        return
+            LiquidityAmounts.getLiquidityForAmounts(
+                sqrtRatioX96,
+                TickMath.getSqrtRatioAtTick(_tickLower),
+                TickMath.getSqrtRatioAtTick(_tickUpper),
+                amount0,
+                amount1
+            );
+    }
+
+    
+    
+    
+    
+    
+    
+    function usersAmounts(IUniswapV3Pool pool,  int24 _tickLower, int24 _tickUpper)
+        internal
+        view
+        returns (uint256 amount0, uint256 amount1)
+    {   
+         
+        bytes32 positionKey = PositionKey.compute(address(this), _tickLower, _tickUpper);
+         
+        (uint128 liquidity, , , uint128 tokensOwed0, uint128 tokensOwed1) =
+            pool.positions(positionKey);
+        
+         
+        (amount0, amount1) = amountsForLiquidity(pool, liquidity, _tickLower, _tickUpper);
+
+        amount0 = amount0.add(tokensOwed0);
+        amount1 = amount1.add(tokensOwed1);
+    }
+
+    
+    
+    
+    
+    
+    function positionLiquidity(IUniswapV3Pool pool, int24 _tickLower, int24 _tickUpper)
+        internal
+        view
+        returns (uint128 liquidity)
+    {
+         
+        bytes32 positionKey = PositionKey.compute(address(this), _tickLower, _tickUpper);
+         
+        (liquidity, , , , ) = pool.positions(positionKey);
+    }
+
+    
+    
+    
+    function checkRange(int24 tickLower, int24 tickUpper) internal pure {
+        require(tickLower < tickUpper, "TLU");
+        require(tickLower >= TickMath.MIN_TICK, "TLM");
+        require(tickUpper <= TickMath.MAX_TICK, "TUM");
+    }
+
+    
+     
+    function floor(int24 tick, int24 tickSpacing) internal pure returns (int24) {
+        int24 compressed = tick / tickSpacing;
+        if (tick < 0 && tick % tickSpacing != 0) compressed--;
+        return compressed * tickSpacing;
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    function getPositionTicks(IUniswapV3Pool pool, uint256 amount0Desired, uint256 amount1Desired, int24 baseThreshold, int24 tickSpacing) internal view returns(int24 tickLower, int24 tickUpper) {
+        Info memory cache = 
+            Info(amount0Desired, amount1Desired, 0, 0, 0, 0, 0);
+         
+        ( uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
+         
+        (cache.tickLower, cache.tickUpper) = baseTicks(currentTick, baseThreshold, tickSpacing);
+         
+        (cache.amount0, cache.amount1) = amountsForTicks(pool, cache.amount0Desired, cache.amount1Desired, cache.tickLower, cache.tickUpper);
+         
+        cache.liquidity = liquidityForAmounts(pool, cache.amount0, cache.amount1, cache.tickLower, cache.tickUpper);
+         
+        bool zeroGreaterOne = amountsDirection(cache.amount0Desired, cache.amount1Desired, cache.amount0, cache.amount1);
+         
+        if ( zeroGreaterOne) {
+            uint160 nextSqrtPrice0 = SqrtPriceMath.getNextSqrtPriceFromAmount0RoundingUp(sqrtPriceX96, cache.liquidity, cache.amount0Desired, false);
+            cache.tickUpper = PoolVariables.floor(TickMath.getTickAtSqrtRatio(nextSqrtPrice0), tickSpacing);
+        }
+        else{
+            uint160 nextSqrtPrice1 = SqrtPriceMath.getNextSqrtPriceFromAmount1RoundingDown(sqrtPriceX96, cache.liquidity, cache.amount1Desired, false);
+            cache.tickLower = PoolVariables.floor(TickMath.getTickAtSqrtRatio(nextSqrtPrice1), tickSpacing);
+        }
+        checkRange(cache.tickLower, cache.tickUpper);
+        
+        tickLower = cache.tickLower;
+        tickUpper = cache.tickUpper;
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    function amountsForTicks(IUniswapV3Pool pool, uint256 amount0Desired, uint256 amount1Desired, int24 _tickLower, int24 _tickUpper) internal view returns(uint256 amount0, uint256 amount1) {
+        uint128 liquidity = liquidityForAmounts(pool, amount0Desired, amount1Desired, _tickLower, _tickUpper);
+
+        (amount0, amount1) = amountsForLiquidity(pool, liquidity, _tickLower, _tickUpper);
+    }
+
+    
+    function baseTicks(int24 currentTick, int24 baseThreshold, int24 tickSpacing) internal pure returns(int24 tickLower, int24 tickUpper) {
+        
+        int24 tickFloor = floor(currentTick, tickSpacing);
+
+        tickLower = tickFloor - baseThreshold;
+        tickUpper = tickFloor + baseThreshold;
+    }
+
+    
+    
+    
+    
+    
+    
+    function amountsDirection(uint256 amount0Desired, uint256 amount1Desired, uint256 amount0, uint256 amount1) internal pure returns (bool zeroGreaterOne) {
+        zeroGreaterOne =  amount0Desired.sub(amount0).mul(amount1Desired) > amount1Desired.sub(amount1).mul(amount0Desired) ?  true : false;
+    }
+
+     
+     
+     
+    function checkDeviation(IUniswapV3Pool pool, int24 maxTwapDeviation, uint32 twapDuration) internal view {
+        (, int24 currentTick, , , , , ) = pool.slot0();
+        int24 twap = getTwap(pool, twapDuration);
+        int24 deviation = currentTick > twap ? currentTick - twap : twap - currentTick;
+        require(deviation <= maxTwapDeviation, "PSC");
+    }
+
+    
+    function getTwap(IUniswapV3Pool pool, uint32 twapDuration) internal view returns (int24) {
+        uint32 _twapDuration = twapDuration;
+        uint32[] memory secondsAgo = new uint32[](2);
+        secondsAgo[0] = _twapDuration;
+        secondsAgo[1] = 0;
+
+        (int56[] memory tickCumulatives, ) = pool.observe(secondsAgo);
+        return int24((tickCumulatives[1] - tickCumulatives[0]) / _twapDuration);
+    }
+}
+
+
+
+interface IUniswapV3PoolActions {
+
+    
+    
+     
+     
+    
+    
+    
+    
+    
+    
+    
+    function mint(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount,
+        bytes calldata data
+    ) external returns (uint256 amount0, uint256 amount1);
+
+    
+    
+     
+     
+     
+    
+    
+    
+    
+    
+    
+    
+    function collect(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount0Requested,
+        uint128 amount1Requested
+    ) external returns (uint128 amount0, uint128 amount1);
+
+    
+    
+    
+    
+    
+    
+    
+    
+    function burn(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount
+    ) external returns (uint256 amount0, uint256 amount1);
+
+    
+    
+    
+    
+    
+    
+     
+    
+    
+    
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
+}
+
+
+
+ 
+interface IUniswapV3PoolDerivedState {
+    
+    
+     
+     
+    
+     
+    
+    
+    
+     
+    function observe(uint32[] calldata secondsAgos)
+        external
+        view
+        returns (int56[] memory tickCumulatives, uint160[] memory secondsPerLiquidityCumulativeX128s);
+}
+
+
+
+ 
+interface IUniswapV3PoolState {
+    
+     
+    
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
+
+    
+    
+    
+     
+     
+     
+     
+    function positions(bytes32 key)
+        external
+        view
+        returns (
+            uint128 _liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        );
+}
+
+
+
+interface IUniswapV3PoolImmutables {
+
+    
+    
+    function token0() external view returns (address);
+
+    
+    
+    function token1() external view returns (address);
+
+    
+    
+     
+     
+    
+    function tickSpacing() external view returns (int24);
+}
+
+
+
+ 
+
+interface IUniswapV3Pool is
+    IUniswapV3PoolImmutables,
+    IUniswapV3PoolState,
+    IUniswapV3PoolDerivedState,
+    IUniswapV3PoolActions
+{
+
+}
+
+
+library PoolActions {
+    using PoolVariables for IUniswapV3Pool;
+    using LowGasSafeMath for uint256;
+    using SafeCast for uint256;
+
+     
+    function burnLiquidityShare(
+        IUniswapV3Pool pool,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 totalSupply,
+        uint256 share,
+        address to
+    ) internal returns (uint256 amount0, uint256 amount1) {
+        require(totalSupply > 0, "TS");
+        uint128 liquidityInPool = pool.positionLiquidity(tickLower, tickUpper);
+        uint256 liquidity = uint256(liquidityInPool).mul(share) / totalSupply;
+
+        if (liquidity > 0) {
+            (amount0, amount1) = pool.burn(tickLower, tickUpper, liquidity.toUint128());
+
+            if (amount0 > 0 || amount1 > 0) {
+             
+                (amount0, amount1) = pool.collect(
+                    to,
+                    tickLower,
+                    tickUpper,
+                    amount0.toUint128(),
+                    amount1.toUint128()
+                );
+            }
+        }
+    }
+
+     
+    function burnAllLiquidity(
+        IUniswapV3Pool pool,
+        int24 tickLower,
+        int24 tickUpper
+    ) internal {
+        
+         
+        uint128 liquidity = pool.positionLiquidity(tickLower, tickUpper);
+        if (liquidity > 0) {
+            pool.burn(tickLower, tickUpper, liquidity);
+        }
+        
+          
+        pool.collect(
+            address(this),
+            tickLower,
+            tickUpper,
+            type(uint128).max,
+            type(uint128).max
+        );
+    }
+}
+
+ 
+library Counters {
+    using LowGasSafeMath for uint256;
+
+    struct Counter {
+         
+         
+         
+        uint256 _value;  
+    }
+
+    function current(Counter storage counter) internal view returns (uint256) {
+        return counter._value;
+    }
+
+    function increment(Counter storage counter) internal {
+         
+        counter._value += 1;
+    }
+}
+
+
+library ChainId {
+    
+    
+    function get() internal pure returns (uint256 chainId) {
+        assembly {
+            chainId := chainid()
+        }
+    }
+}
+
+ 
+library ECDSA {
+     
+    function recover(bytes32 hash, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
+         
+         
+         
+         
+         
+         
+         
+         
+         
+        require(uint256(s) <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0, "ISS");
+        require(v == 27 || v == 28, "ISV");
+
+         
+        address signer = ecrecover(hash, v, r, s);
+        require(signer != address(0), "IS");
+
+        return signer;
+    }
+
+     
+    function toTypedDataHash(bytes32 domainSeparator, bytes32 structHash) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    }
+}
+
+ 
+abstract contract EIP712 {
+     
+     
+     
+    bytes32 private immutable _CACHED_DOMAIN_SEPARATOR;
+    uint256 private immutable _CACHED_CHAIN_ID;
+
+    bytes32 private immutable _HASHED_NAME;
+    bytes32 private immutable _HASHED_VERSION;
+    bytes32 private immutable _TYPE_HASH;
+     
+
+     
+    constructor(string memory name, string memory version) {
+        bytes32 hashedName = keccak256(bytes(name));
+        bytes32 hashedVersion = keccak256(bytes(version));
+        bytes32 typeHash = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+        _HASHED_NAME = hashedName;
+        _HASHED_VERSION = hashedVersion;
+        _CACHED_CHAIN_ID = ChainId.get();
+        _CACHED_DOMAIN_SEPARATOR = _buildDomainSeparator(typeHash, hashedName, hashedVersion);
+        _TYPE_HASH = typeHash;
+    }
+
+     
+    function _domainSeparatorV4() internal view returns (bytes32) {
+        if (ChainId.get() == _CACHED_CHAIN_ID) {
+            return _CACHED_DOMAIN_SEPARATOR;
+        } else {
+            return _buildDomainSeparator(_TYPE_HASH, _HASHED_NAME, _HASHED_VERSION);
+        }
+    }
+
+    function _buildDomainSeparator(bytes32 typeHash, bytes32 name, bytes32 version) private view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                typeHash,
+                name,
+                version,
+                ChainId.get(),
+                address(this)
+            )
+        );
+    }
+
+     
+    function _hashTypedDataV4(bytes32 structHash) internal view virtual returns (bytes32) {
+        return ECDSA.toTypedDataHash(_domainSeparatorV4(), structHash);
+    }
+}
+
+ 
+interface IERC20Permit {
+     
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+
+     
+    function nonces(address owner) external view returns (uint256);
+
+     
+     
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+}
+
+ 
+abstract contract Context {
+    function _msgSender() internal view virtual returns (address payable) {
+        return msg.sender;
+    }
+
+    function _msgData() internal view virtual returns (bytes memory) {
+        this;  
+        return msg.data;
+    }
+}
+
+ 
+contract ERC20 is Context, IERC20 {
+    using LowGasSafeMath for uint256;
+
+    mapping (address => uint256) private _balances;
+
+    mapping (address => mapping (address => uint256)) private _allowances;
+
+    uint256 private _totalSupply;
+
+    string private _name;
+    string private _symbol;
+    uint8 private _decimals;
+
+     
+    constructor (string memory name_, string memory symbol_) {
+        _name = name_;
+        _symbol = symbol_;
+        _decimals = 18;
+    }
+
+     
+    function name() public view virtual returns (string memory) {
+        return _name;
+    }
+
+     
+    function symbol() public view virtual returns (string memory) {
+        return _symbol;
+    }
+
+     
+    function decimals() public view virtual returns (uint8) {
+        return _decimals;
+    }
+
+     
+    function totalSupply() public view virtual override returns (uint256) {
+        return _totalSupply;
+    }
+
+     
+    function balanceOf(address account) public view virtual override returns (uint256) {
+        return _balances[account];
+    }
+
+     
+    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
+    }
+
+     
+    function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+     
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        _approve(_msgSender(), spender, amount);
+        return true;
+    }
+
+     
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
+        _transfer(sender, recipient, amount);
+        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "TEA"));
+        return true;
+    }
+
+     
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
+        return true;
+    }
+
+     
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "DEB"));
+        return true;
+    }
+
+     
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+        require(sender != address(0), "FZA");
+        require(recipient != address(0), "TZA");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        _balances[sender] = _balances[sender].sub(amount, "TEB");
+        _balances[recipient] = _balances[recipient].add(amount);
+        emit Transfer(sender, recipient, amount);
+    }
+
+     
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "MZA");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply = _totalSupply.add(amount);
+        _balances[account] = _balances[account].add(amount);
+        emit Transfer(address(0), account, amount);
+    }
+
+     
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "BZA");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        _balances[account] = _balances[account].sub(amount, "BEB");
+        _totalSupply = _totalSupply.sub(amount);
+        emit Transfer(account, address(0), amount);
+    }
+
+     
+    function _approve(address owner, address spender, uint256 amount) internal virtual {
+        require(owner != address(0), "AFZA");
+        require(spender != address(0), "ATZA");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+
+     
+    function _setupDecimals(uint8 decimals_) internal virtual {
+        _decimals = decimals_;
+    }
+
+     
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+}
+
+ 
+abstract contract ERC20Permit is ERC20, IERC20Permit, EIP712 {
+    using Counters for Counters.Counter;
+
+    mapping (address => Counters.Counter) private _nonces;
+ 
+     
+    bytes32 private immutable _PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
+
+     
+    constructor(string memory name) EIP712(name, "1") {
+    }
+
+     
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) public virtual override {
+         
+        require(block.timestamp <= deadline, "ED");
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _PERMIT_TYPEHASH,
+                owner,
+                spender,
+                value,
+                _useNonce(owner),
+                deadline
+            )
+        );
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, v, r, s);
+        require(signer == owner, "IS");
+
+        _approve(owner, spender, value);
+    }
+
+     
+    function nonces(address owner) public view virtual override returns (uint256) {
+        return _nonces[owner].current();
+    }
+
+     
+     
+    function DOMAIN_SEPARATOR() external view override returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+     
+    function _useNonce(address owner) internal virtual returns (uint256 current) {
+        Counters.Counter storage nonce = _nonces[owner];
+        current = nonce.current();
+        nonce.increment();
+    }
+}
+
+
+
+
+library FixedPoint96 {
+    uint8 internal constant RESOLUTION = 96;
+    uint256 internal constant Q96 = 0x1000000000000000000000000;
+}
+
+
+
+library UnsafeMath {
+    
+    
+    
+    
+    
+    function divRoundingUp(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        assembly {
+            z := add(div(x, y), gt(mod(x, y), 0))
+        }
+    }
+
+    
+    
+    
+    
+    
+    function unsafeDiv(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        assembly {
+            z := div(x, y)
+        }
+    }
+}
+
+
+
+
+library FullMath {
+    
+    
+    
+    
+    
+    
+    function mulDiv(
+        uint256 a,
+        uint256 b,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+         
+         
+         
+         
+         
+        uint256 prod0;  
+        uint256 prod1;  
+        assembly {
+            let mm := mulmod(a, b, not(0))
+            prod0 := mul(a, b)
+            prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+        }
+
+         
+        if (prod1 == 0) {
+            require(denominator > 0);
+            assembly {
+                result := div(prod0, denominator)
+            }
+            return result;
+        }
+
+         
+         
+        require(denominator > prod1);
+
+         
+         
+         
+
+         
+         
+        uint256 remainder;
+        assembly {
+            remainder := mulmod(a, b, denominator)
+        }
+         
+        assembly {
+            prod1 := sub(prod1, gt(remainder, prod0))
+            prod0 := sub(prod0, remainder)
+        }
+
+         
+         
+         
+        uint256 twos = -denominator & denominator;
+         
+        assembly {
+            denominator := div(denominator, twos)
+        }
+
+         
+        assembly {
+            prod0 := div(prod0, twos)
+        }
+         
+         
+         
+        assembly {
+            twos := add(div(sub(0, twos), twos), 1)
+        }
+        prod0 |= prod1 * twos;
+
+         
+         
+         
+         
+         
+        uint256 inv = (3 * denominator) ^ 2;
+         
+         
+         
+        inv *= 2 - denominator * inv;  
+        inv *= 2 - denominator * inv;  
+        inv *= 2 - denominator * inv;  
+        inv *= 2 - denominator * inv;  
+        inv *= 2 - denominator * inv;  
+        inv *= 2 - denominator * inv;  
+
+         
+         
+         
+         
+         
+         
+        result = prod0 * inv;
+        return result;
+    }
+
+    
+    
+    
+    
+    
+    function mulDivRoundingUp(
+        uint256 a,
+        uint256 b,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+        result = mulDiv(a, b, denominator);
+        if (mulmod(a, b, denominator) > 0) {
+            require(result < type(uint256).max);
+            result++;
+        }
+    }
+}
+
+
+
+library SafeCast {
+    
+    
+    
+    function toUint160(uint256 y) internal pure returns (uint160 z) {
+        require((z = uint160(y)) == y);
+    }
+
+    
+    
+    
+    function toUint128(uint256 y) internal pure returns (uint128 z) {
+        require((z = uint128(y)) == y);
+    }
+
+    
+    
+    
+    function toInt128(int256 y) internal pure returns (int128 z) {
+        require((z = int128(y)) == y);
+    }
+
+    
+    
+    
+    function toInt256(uint256 y) internal pure returns (int256 z) {
+        require(y < 2**255);
+        z = int256(y);
+    }
+}
+
+
+
+library LowGasSafeMath {
+    
+    
+    
+    
+    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require((z = x + y) >= x);
+    }
+
+    
+    
+    
+    
+    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require((z = x - y) <= x);
+    }
+
+    
+    
+    
+    
+    function mul(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        require(x == 0 || (z = x * y) / x == y);
+    }
+
+    
+    
+    
+    
+    function sub(uint256 x, uint256 y, string memory errorMessage) internal pure returns (uint256 z) {
+        require((z = x - y) <= x, errorMessage);
+    }
+
+    
+    
+    
+    
+    function add(int256 x, int256 y) internal pure returns (int256 z) {
+        require((z = x + y) >= x == (y >= 0));
+    }
+
+    
+    
+    
+    
+    function sub(int256 x, int256 y) internal pure returns (int256 z) {
+        require((z = x - y) <= x == (y >= 0));
+    }
+
+    
+    
+    
+    
+    function add128(uint128 x, uint128 y) internal pure returns (uint128 z) {
+        require((z = x + y) >= x);
+    }
+
+    
+    
+    
+    
+    function sub128(uint128 x, uint128 y) internal pure returns (uint128 z) {
+        require((z = x - y) <= x);
+    }
+
+    
+    
+    
+    
+    function mul128(uint128 x, uint128 y) internal pure returns (uint128 z) {
+        require(x == 0 || (z = x * y) / x == y);
+    }
+
+    
+    
+    
+    
+    function add160(uint160 x, uint160 y) internal pure returns (uint160 z) {
+        require((z = x + y) >= x);
+    }
+
+    
+    
+    
+    
+    function sub160(uint160 x, uint160 y) internal pure returns (uint160 z) {
+        require((z = x - y) <= x);
+    }
+
+    
+    
+    
+    
+    function mul160(uint160 x, uint160 y) internal pure returns (uint160 z) {
+        require(x == 0 || (z = x * y) / x == y);
+    }
+}
+
+
+
+library SqrtPriceMath {
+    using LowGasSafeMath for uint256;
+    using SafeCast for uint256;
+
+    
+    
+     
+     
+     
+     
+    
+    
+    
+    
+    
+    function getNextSqrtPriceFromAmount0RoundingUp(
+        uint160 sqrtPX96,
+        uint128 liquidity,
+        uint256 amount,
+        bool add
+    ) internal pure returns (uint160) {
+         
+        if (amount == 0) return sqrtPX96;
+        uint256 numerator1 = uint256(liquidity) << FixedPoint96.RESOLUTION;
+
+        if (add) {
+            uint256 product;
+            if ((product = amount * sqrtPX96) / amount == sqrtPX96) {
+                uint256 denominator = numerator1 + product;
+                if (denominator >= numerator1)
+                     
+                    return uint160(FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator));
+            }
+
+            return uint160(UnsafeMath.divRoundingUp(numerator1, (numerator1 / sqrtPX96).add(amount)));
+        } else {
+            uint256 product;
+             
+             
+            require((product = amount * sqrtPX96) / amount == sqrtPX96 && numerator1 > product);
+            uint256 denominator = numerator1 - product;
+            return FullMath.mulDivRoundingUp(numerator1, sqrtPX96, denominator).toUint160();
+        }
+    }
+
+    
+    
+     
+     
+     
+    
+    
+    
+    
+    
+    function getNextSqrtPriceFromAmount1RoundingDown(
+        uint160 sqrtPX96,
+        uint128 liquidity,
+        uint256 amount,
+        bool add
+    ) internal pure returns (uint160) {
+         
+         
+        if (add) {
+            uint256 quotient =
+                (
+                    amount <= type(uint160).max
+                        ? (amount << FixedPoint96.RESOLUTION) / liquidity
+                        : FullMath.mulDiv(amount, FixedPoint96.Q96, liquidity)
+                );
+
+            return uint256(sqrtPX96).add(quotient).toUint160();
+        } else {
+            uint256 quotient =
+                (
+                    amount <= type(uint160).max
+                        ? UnsafeMath.divRoundingUp(amount << FixedPoint96.RESOLUTION, liquidity)
+                        : FullMath.mulDivRoundingUp(amount, FixedPoint96.Q96, liquidity)
+                );
+
+            require(sqrtPX96 > quotient);
+             
+            return uint160(sqrtPX96 - quotient);
+        }
+    }
+}
+
+
+library TransferHelper {
+    
+    
+    
+    
+    
+    
+    function safeTransferFrom(
+        address token,
+        address from,
+        address to,
+        uint256 value
+    ) internal {
+        (bool success, bytes memory data) =
+            token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'STF');
+    }
+
+    
+    
+    
+    
+    
+    function safeTransfer(
+        address token,
+        address to,
+        uint256 value
+    ) internal {
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'ST');
+    }
+}
+
+ 
+abstract contract ReentrancyGuard {
+     
+     
+     
+     
+     
+
+     
+     
+     
+     
+     
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
+    uint256 private _status;
+
+    constructor () {
+        _status = _NOT_ENTERED;
+    }
+
+     
+    modifier nonReentrant() {
+         
+        require(_status != _ENTERED, "RC");
+
+         
+        _status = _ENTERED;
+
+        _;
+
+         
+         
+        _status = _NOT_ENTERED;
+    }
+}
+
+
+
+ 
+ 
+ 
+ 
+contract PopsicleV3Optimizer is ERC20Permit, ReentrancyGuard, IPopsicleV3Optimizer {
+    using LowGasSafeMath for uint256;
+    using LowGasSafeMath for uint160;
+    using LowGasSafeMath for uint128;
+    using UnsafeMath for uint256;
+    using SafeCast for uint256;
+    using PoolVariables for IUniswapV3Pool;
+    using PoolActions for IUniswapV3Pool;
+    
+     
+    struct MintCallbackData {
+        address payer;
+    }
+     
+    struct SwapCallbackData {
+        bool zeroForOne;
+    }
+
+    
+    
+    
+    
+    
+    
+    event Deposit(
+        address indexed sender,
+        address indexed recipient,
+        uint256 share,
+        uint256 amount0,
+        uint256 amount1
+    );
+    
+    
+    
+    
+    
+    
+    
+    event Withdraw(
+        address indexed sender,
+        address indexed recipient,
+        uint256 shares,
+        uint256 amount0,
+        uint256 amount1
+    );
+    
+    
+    
+    
+    
+    
+    event CollectFees(
+        uint256 feesFromPool0,
+        uint256 feesFromPool1,
+        uint256 usersFees0,
+        uint256 usersFees1
+    );
+
+    
+    
+    
+    event CompoundFees(
+        uint256 amount0,
+        uint256 amount1
+    );
+
+    
+    
+    
+    
+    
+    event Rerange(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0,
+        uint256 amount1
+    );
+    
+    
+    
+    
+    
+    event RewardPaid(
+        address indexed sender,
+        uint256 fees0,
+        uint256 fees1
+    );
+    
+    
+    
+    
+    event Snapshot(uint256 totalAmount0, uint256 totalAmount1);
+
+    event TransferGovernance(address indexed previousGovernance, address indexed newGovernance);
+    
+    
+    modifier onlyGovernance {
+        require(msg.sender == governance, "OG");
+        _;
+    }
+
+    
+    address public immutable override token0;
+    
+    address public immutable override token1;
+     
+    int24 public immutable override tickSpacing;
+    uint24 constant MULTIPLIER = 1e6;
+    uint24 constant GLOBAL_DIVISIONER = 1e6;  
+     
+    uint24 constant protocolFee = 1e5;  
+
+    mapping (address => bool) private _operatorApproved;
+
+     
+    IUniswapV3Pool public override pool;
+     
+    uint256 public protocolFees0;
+     
+    uint256 public protocolFees1;
+     
+    uint256 public totalFees0;
+     
+    uint256 public totalFees1;
+    
+     
+    address public governance;
+     
+    address public pendingGovernance;
+     
+    address public strategy;
+     
+    int24 public override tickLower;
+     
+    int24 public override tickUpper;
+     
+    bool public initialized;
+
+    bool private _paused = false;
+    
+     
+     constructor(
+        address _pool,
+        address _strategy
+    ) ERC20("Popsicle LP V3 MIM/UST", "PLP") ERC20Permit("Popsicle LP V3 MIM/UST") {
+        pool = IUniswapV3Pool(_pool);
+        strategy = _strategy;
+        token0 = pool.token0();
+        token1 = pool.token1();
+        tickSpacing = pool.tickSpacing();
+        governance = msg.sender;
+        _operatorApproved[msg.sender] = true;
+    }
+     
+    function init() external onlyGovernance {
+        require(!initialized, "F");
+        initialized = true;
+        int24 baseThreshold = tickSpacing * IOptimizerStrategy(strategy).tickRangeMultiplier();
+        ( , int24 currentTick, , , , , ) = pool.slot0();
+        int24 tickFloor = PoolVariables.floor(currentTick, tickSpacing);
+        
+        tickLower = tickFloor - baseThreshold;
+        tickUpper = tickFloor + baseThreshold;
+        PoolVariables.checkRange(tickLower, tickUpper);  
+    }
+    
+    
+     function deposit(
+        uint256 amount0Desired,
+        uint256 amount1Desired,
+        address to
+    )
+        external
+        override
+        nonReentrant
+        checkDeviation
+        whenNotPaused
+        returns (
+            uint256 shares,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        _earnFees();
+        _compoundFees();  
+        uint128 liquidityLast = pool.positionLiquidity(tickLower, tickUpper);
+        
+         
+        uint128 liquidity = pool.liquidityForAmounts(amount0Desired, amount1Desired, tickLower, tickUpper);
+        
+        (amount0, amount1) = pool.mint(
+            address(this),
+            tickLower,
+            tickUpper,
+            liquidity,
+            abi.encode(MintCallbackData({payer: msg.sender})));
+        
+        require(amount0 > 0 && amount1 > 0, "ANV");
+        shares = totalSupply() == 0 ? liquidity*MULTIPLIER : FullMath.mulDiv(liquidity, totalSupply(), liquidityLast);
+
+        _mint(to, shares);
+        require(IOptimizerStrategy(strategy).maxTotalSupply() >= totalSupply(), "MTS");
+        emit Deposit(msg.sender, to, shares, amount0, amount1);
+    }
+    
+    
+    function withdraw(
+        uint256 shares,
+        address to
+    ) 
+        external
+        override
+        nonReentrant
+        checkDeviation
+        whenNotPaused
+        returns (
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        require(shares > 0, "S");
+        require(to != address(0), "WZA");
+        _earnFees();
+        _compoundFees();
+        (amount0, amount1) = pool.burnLiquidityShare(tickLower, tickUpper, totalSupply(), shares,  to);
+        require(amount0 > 0 || amount1 > 0, "EA");
+
+         
+        _burn(msg.sender, shares);
+
+        emit Withdraw(msg.sender, to, shares, amount0, amount1);
+    }
+    
+    
+    function rerange() external override nonReentrant checkDeviation {
+        require(_operatorApproved[msg.sender], "ONA");
+        _earnFees();
+         
+        pool.burnAllLiquidity(tickLower, tickUpper);
+        
+
+         
+        uint256 balance0 = _balance0();
+        uint256 balance1 = _balance1();
+        emit Snapshot(balance0, balance1);
+
+        int24 baseThreshold = tickSpacing * IOptimizerStrategy(strategy).tickRangeMultiplier();
+
+         
+        (tickLower, tickUpper) = pool.getPositionTicks(balance0, balance1, baseThreshold, tickSpacing);
+
+         
+        uint128 liquidity = pool.liquidityForAmounts(balance0, balance1, tickLower, tickUpper);
+        
+         
+        (uint256 amount0, uint256 amount1) = pool.mint(
+            address(this),
+            tickLower,
+            tickUpper,
+            liquidity,
+            abi.encode(MintCallbackData({payer: address(this)})));
+
+        emit Rerange(tickLower, tickUpper, amount0, amount1);
+    }
+
+    
+    function rebalance() external override nonReentrant checkDeviation {
+        require(_operatorApproved[msg.sender], "ONA");
+        _earnFees();
+         
+        pool.burnAllLiquidity(tickLower, tickUpper);
+        
+         
+        (uint160 sqrtPriceX96, int24 currentTick, , , , , ) = pool.slot0();
+        PoolVariables.Info memory cache;
+        int24 baseThreshold = tickSpacing * IOptimizerStrategy(strategy).tickRangeMultiplier();
+        (cache.tickLower, cache.tickUpper) = PoolVariables.baseTicks(currentTick, baseThreshold, tickSpacing);
+        
+        cache.amount0Desired = _balance0();
+        cache.amount1Desired = _balance1();
+        emit Snapshot(cache.amount0Desired, cache.amount1Desired);
+         
+        cache.liquidity = pool.liquidityForAmounts(cache.amount0Desired, cache.amount1Desired, cache.tickLower, cache.tickUpper);
+
+         
+        (cache.amount0, cache.amount1) = pool.amountsForLiquidity(cache.liquidity, cache.tickLower, cache.tickUpper);
+
+         
+        bool zeroForOne = PoolVariables.amountsDirection(cache.amount0Desired, cache.amount1Desired, cache.amount0, cache.amount1);
+         
+        int256 amountSpecified = 
+            zeroForOne
+                ? int256(cache.amount0Desired.sub(cache.amount0).unsafeDiv(2))
+                : int256(cache.amount1Desired.sub(cache.amount1).unsafeDiv(2));  
+
+         
+        uint160 exactSqrtPriceImpact = sqrtPriceX96.mul160(IOptimizerStrategy(strategy).priceImpactPercentage() / 2) / GLOBAL_DIVISIONER;
+        uint160 sqrtPriceLimitX96 = zeroForOne ?  sqrtPriceX96.sub160(exactSqrtPriceImpact) : sqrtPriceX96.add160(exactSqrtPriceImpact);
+
+         
+        pool.swap(
+            address(this),
+            zeroForOne,
+            amountSpecified,
+            sqrtPriceLimitX96,
+            abi.encode(SwapCallbackData({zeroForOne: zeroForOne}))
+        );
+
+
+        (sqrtPriceX96, currentTick, , , , , ) = pool.slot0();
+
+         
+        cache.amount0Desired = _balance0();
+        cache.amount1Desired = _balance1();
+        emit Snapshot(cache.amount0Desired, cache.amount1Desired);
+         
+        (tickLower, tickUpper) = pool.getPositionTicks(cache.amount0Desired, cache.amount1Desired, baseThreshold, tickSpacing);
+
+        cache.liquidity = pool.liquidityForAmounts(cache.amount0Desired, cache.amount1Desired, tickLower, tickUpper);
+
+         
+        (cache.amount0, cache.amount1) = pool.mint(
+            address(this),
+            tickLower,
+            tickUpper,
+            cache.liquidity,
+            abi.encode(MintCallbackData({payer: address(this)})));
+
+        emit Rerange(tickLower, tickUpper, cache.amount0, cache.amount1);
+    }
+    
+    
+    function _balance0() internal view returns (uint256) {
+        return IERC20(token0).balanceOf(address(this)).sub(protocolFees0);
+    }
+
+    
+    function _balance1() internal view returns (uint256) {
+        return IERC20(token1).balanceOf(address(this)).sub(protocolFees1);
+    }
+    
+    
+    function _earnFees() internal {
+        uint liquidity = pool.positionLiquidity(tickLower, tickUpper);
+        if (liquidity == 0) return;  
+          
+        pool.burn(tickLower, tickUpper, 0);
+        
+        (uint256 collect0, uint256 collect1) =
+            pool.collect(
+                address(this),
+                tickLower,
+                tickUpper,
+                type(uint128).max,
+                type(uint128).max
+            );
+
+         
+        uint256 earnedProtocolFees0 = collect0.mul(protocolFee).unsafeDiv(GLOBAL_DIVISIONER);
+        uint256 earnedProtocolFees1 = collect1.mul(protocolFee).unsafeDiv(GLOBAL_DIVISIONER);
+        protocolFees0 = protocolFees0.add(earnedProtocolFees0);
+        protocolFees1 = protocolFees1.add(earnedProtocolFees1);
+        totalFees0 = totalFees0.add(collect0);
+        totalFees1 = totalFees1.add(collect1);
+        emit CollectFees(collect0, collect1, totalFees0, totalFees1);
+    }
+
+    function _compoundFees() internal returns (uint256 amount0, uint256 amount1){
+        uint256 balance0 = _balance0();
+        uint256 balance1 = _balance1();
+
+        emit Snapshot(balance0, balance1);
+
+         
+        uint128 liquidity = pool.liquidityForAmounts(balance0, balance1, tickLower, tickUpper);
+        
+         
+        if (liquidity > 0)
+        {
+            (amount0, amount1) = pool.mint(
+                address(this),
+                tickLower,
+                tickUpper,
+                liquidity,
+                abi.encode(MintCallbackData({payer: address(this)})));
+            emit CompoundFees(amount0, amount1);
+        }
+    }
+
+    
+    function position() external view returns (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1) {
+        bytes32 positionKey = PositionKey.compute(address(this), tickLower, tickUpper);
+        (liquidity, feeGrowthInside0LastX128, feeGrowthInside1LastX128, tokensOwed0, tokensOwed1) = pool.positions(positionKey);
+    }
+
+    
+    function usersAmounts() public view returns (uint256 amount0, uint256 amount1) {
+        (amount0, amount1) = pool.usersAmounts(tickLower, tickUpper);
+        amount0 = amount0.add(_balance0());
+        amount1 = amount1.add(_balance1());
+    }
+    
+    
+    
+    
+    
+    
+    function uniswapV3MintCallback(
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata data
+    ) external {
+        require(msg.sender == address(pool), "FP");
+        MintCallbackData memory decoded = abi.decode(data, (MintCallbackData));
+        if (amount0 > 0) pay(token0, decoded.payer, msg.sender, amount0);
+        if (amount1 > 0) pay(token1, decoded.payer, msg.sender, amount1);
+    }
+
+    
+    
+    
+    
+    
+    function uniswapV3SwapCallback(
+        int256 amount0,
+        int256 amount1,
+        bytes calldata _data
+    ) external {
+        require(msg.sender == address(pool), "FP");
+        require(amount0 > 0 || amount1 > 0, "LEZ");  
+        SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
+        bool zeroForOne = data.zeroForOne;
+
+        if (zeroForOne) pay(token0, address(this), msg.sender, uint256(amount0)); 
+        else pay(token1, address(this), msg.sender, uint256(amount1));
+    }
+
+    
+    
+    
+    
+    function pay(
+        address token,
+        address payer,
+        address recipient,
+        uint256 value
+    ) internal {
+        if (payer == address(this)) {
+             
+            TransferHelper.safeTransfer(token, recipient, value);
+        } else {
+             
+            TransferHelper.safeTransferFrom(token, payer, recipient, value);
+        }
+    }
+    
+     
+    function collectProtocolFees(
+        uint256 amount0,
+        uint256 amount1
+    ) external nonReentrant onlyGovernance {
+        _earnFees();
+        require(protocolFees0 >= amount0, "A0F");
+        require(protocolFees1 >= amount1, "A1F");
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
+        require(balance0 >= amount0 && balance1 >= amount1);
+        if (amount0 > 0) pay(token0, address(this), msg.sender, amount0);
+        if (amount1 > 0) pay(token1, address(this), msg.sender, amount1);
+        
+        protocolFees0 = protocolFees0.sub(amount0);
+        protocolFees1 = protocolFees1.sub(amount1);
+        _compoundFees();
+        emit RewardPaid(msg.sender, amount0, amount1);
+    }
+
+     
+     
+     
+    modifier checkDeviation() {
+        pool.checkDeviation(IOptimizerStrategy(strategy).maxTwapDeviation(), IOptimizerStrategy(strategy).twapDuration());
+        _;
+    }
+
+     
+    function setGovernance(address _governance) external onlyGovernance {
+        pendingGovernance = _governance;
+    }
+
+     
+    function acceptGovernance() external {
+        require(msg.sender == pendingGovernance, "PG");
+        emit TransferGovernance(governance, pendingGovernance);
+        pendingGovernance = address(0);
+        governance = msg.sender;
+    }
+
+     
+    function setStrategy(address _strategy) external onlyGovernance {
+        require(_strategy != address(0), "NA");
+        strategy = _strategy;
+    }
+
+    function approveOperator(address _operator) external onlyGovernance {
+        _operatorApproved[_operator] = true;
+    }
+    
+    function disableOperator(address _operator) external onlyGovernance {
+        _operatorApproved[_operator] = false;
+    }
+    
+    function isOperator(address _operator) external view returns (bool) {
+        return _operatorApproved[_operator];
+    }
+
+     
+    modifier whenNotPaused() {
+        require(!_paused, "P");
+        _;
+    }
+
+     
+    modifier whenPaused() {
+        require(_paused, "NP");
+        _;
+    }
+
+     
+    function pause() external onlyGovernance whenNotPaused {
+        _paused = true;
+    }
+
+     
+    function unpause() external onlyGovernance whenPaused {
+        _paused = false;
+    }
+}

@@ -40,11 +40,14 @@ def remove_comment(inputFile, outputFile):
 
 
 if __name__ == '__main__':
-    original_dir = "../data/timestamp/source_code/22247.sol"
-    output_dir = "../data/timestamp/22247.sol"
+    # original_dir = "../data/timestamp/source_code/22247.sol"
+    # output_dir = "../data/timestamp/22247.sol"
 
-    # dir = os.listdir(original_dir)
-    # for i in dir:
-    #     print(i)
-    #     remove_comment(original_dir + i, output_dir + i)
-    remove_comment(original_dir, output_dir)
+    original_dir = '../mainnet_sample/'
+    output_dir = '../mainnet_sample_remove_comment/'
+    
+    dir = os.listdir(original_dir)
+    for i in dir:
+        print(i)
+        remove_comment(original_dir + i, output_dir + i)
+    # remove_comment(original_dir, output_dir)
